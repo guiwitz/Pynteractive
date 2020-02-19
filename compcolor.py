@@ -44,7 +44,7 @@ class Combcol:
         self.selected_contrast = [(0.0, 255.0) for i in range(3)]
         self.selected_colors = ['Red', 'Green', 'Blue']
         
-        self.possible_colors = ['Red','Green','Blue','Cyan']
+        self.possible_colors = ['Red','Green','Blue','Cyan','Magenta']
         self.color_select = [ipw.Select(options = self.possible_colors, value = self.possible_colors[i],layout={'width': '300px'}) for i in range(3)]
         
         self.def_colormaps()
@@ -76,6 +76,9 @@ class Combcol:
         custom_map = ListedColormap(np.c_[np.zeros(256),np.linspace(0,1,256),np.linspace(0,1,256)])
         self.colormaps['Cyan'] = custom_map
         
+        custom_map = ListedColormap(np.c_[np.linspace(0,1,256),np.zeros(256),np.linspace(0,1,256)])
+        self.colormaps['Magenta'] = custom_map
+        
         
     def combine(self, images, colors = None, contrast = None):
         '''Combine up to three images in a maximum projection RGB image'''
@@ -98,11 +101,13 @@ class Combcol:
     def interactive_colors(self):
         '''Create an interactive GUI to set colors and contrast'''
         
+        #define three sliders for contrast
         contrast = [ipw.FloatRangeSlider(min=0,max = 255, step=1, value = (0,255),layout={'width': '300px'}) for i in range(3)]
-        time_slider = ipw.IntSlider(min=0, max = self.image.shape[0], value = 0, description = 'Time')
-        possible_colors = ['Red','Green','Blue','Cyan']
-        #color_select = [ipw.Select(options = possible_colors, value = possible_colors[i],layout={'width': '300px'}) for i in range(3)]
         
+        #define time slider
+        time_slider = ipw.IntSlider(min=0, max = self.image.shape[0]-1, value = 0, description = 'Time')
+        
+        #define plotting function that automatically updates with widgets
         def f(c0, c1, c2, t, col0, col1, col2, im):
             
             self.selected_colors = [col0, col1, col2]
@@ -114,12 +119,14 @@ class Combcol:
             plt.figure(figsize=(4,4))
             plt.imshow(im_combined)
 
+        #create dictionary of widgets 'ui_widgets' needed for interactive_output()   
         ui_contrast = {'c'+str(ind): x for ind, x in enumerate(contrast)}
         ui_time = {'t':time_slider}
         ui_im ={'im' : ipw.fixed(self.image)}
         ui_col = {'col'+str(ind): x for ind, x in enumerate(self.color_select)}
         ui_widgets = {**ui_contrast, **ui_time, **ui_col, **ui_im}
 
+        #create a wideget container 'ui' for widget rendering
         children = [ipw.VBox([ipw.HTML('Channel '+str(ind)), contrast[ind], self.color_select[ind]]) for ind in range(3)]
         tab = ipw.Tab()
         tab.children = children
@@ -129,15 +136,17 @@ class Combcol:
         tab_col = ipw.HBox([tab, ipw.VBox([self.colorpick, self.createLUT_button])])
         ui = ipw.VBox([time_slider, tab_col])
 
+        #connecte rendering function with widets
         out = ipw.interactive_output(f, ui_widgets)
 
+        #display widgets (ui) and plot (out)
         display(ipw.HBox([out, ui]))
     
     
     def movie_histogram(self):
         '''Create animated figure of image and histogram'''
         
-        fig, axes = plt.subplots(1,2,figsize = (7,3))
+        fig, axes = plt.subplots(1,2,figsize = (10,5))
         ims=[]
         for t in range(self.image.shape[0]):
 
@@ -185,20 +194,6 @@ class Combcol:
         '''Call-back for movie creation button'''
         
         ani = self.movie_histogram()
-
-        '''
-        #using imageio
-        filename = 'movie.mp4'
-        vid = imageio.get_reader(filename,  'ffmpeg')
-
-        ims=[]
-        fig = plt.figure(figsize=(10,5))
-        for x in list(vid.iter_data()):
-            im = plt.imshow(x,animated=True)
-            ims.append([im])
-            
-        ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True,
-                                repeat_delay=1000)'''
         
         self.out_movie.clear_output()
         with self.out_movie:
