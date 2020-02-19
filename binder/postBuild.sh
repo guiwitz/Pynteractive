@@ -2,3 +2,9 @@
 cp jupyter_notebook_config.py ~/.jupyter/
 
 python installation/download.py
+
+jupyter labextension install @jupyter-widgets/jupyterlab-manager --no-build
+jupyter labextension install @jupyter-voila/jupyterlab-preview --no-build
+jupyter labextension install jupyter-matplotlib --no-build
+
+jupyter lab build
