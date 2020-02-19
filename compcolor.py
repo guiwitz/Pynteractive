@@ -44,11 +44,18 @@ class Combcol:
         self.selected_contrast = [(0.0, 255.0) for i in range(3)]
         self.selected_colors = ['Red', 'Green', 'Blue']
         
+        self.possible_colors = ['Red','Green','Blue','Cyan']
+        self.color_select = [ipw.Select(options = self.possible_colors, value = self.possible_colors[i],layout={'width': '300px'}) for i in range(3)]
+        
         self.def_colormaps()
         
         self.hist_button = ipw.Button(description = 'Create movie')
         self.hist_button.on_click(self.button_callback)
         self.out_movie = ipw.Output()
+        
+        self.colorpick = ipw.ColorPicker()
+        self.createLUT_button = ipw.Button(description = 'Create colormap')
+        self.createLUT_button.on_click(self.createLUT)
         
        
     def def_colormaps(self):
@@ -94,7 +101,7 @@ class Combcol:
         contrast = [ipw.FloatRangeSlider(min=0,max = 255, step=1, value = (0,255),layout={'width': '300px'}) for i in range(3)]
         time_slider = ipw.IntSlider(min=0, max = self.image.shape[0], value = 0, description = 'Time')
         possible_colors = ['Red','Green','Blue','Cyan']
-        color_select = [ipw.Select(options = possible_colors, value = possible_colors[i],layout={'width': '300px'}) for i in range(3)]
+        #color_select = [ipw.Select(options = possible_colors, value = possible_colors[i],layout={'width': '300px'}) for i in range(3)]
         
         def f(c0, c1, c2, t, col0, col1, col2, im):
             
@@ -110,16 +117,17 @@ class Combcol:
         ui_contrast = {'c'+str(ind): x for ind, x in enumerate(contrast)}
         ui_time = {'t':time_slider}
         ui_im ={'im' : ipw.fixed(self.image)}
-        ui_col = {'col'+str(ind): x for ind, x in enumerate(color_select)}
+        ui_col = {'col'+str(ind): x for ind, x in enumerate(self.color_select)}
         ui_widgets = {**ui_contrast, **ui_time, **ui_col, **ui_im}
 
-        children = [ipw.VBox([ipw.HTML('Channel '+str(ind)), contrast[ind], color_select[ind]]) for ind in range(3)]
+        children = [ipw.VBox([ipw.HTML('Channel '+str(ind)), contrast[ind], self.color_select[ind]]) for ind in range(3)]
         tab = ipw.Tab()
         tab.children = children
         for i in range(len(children)):
             tab.set_title(i, 'Channel '+str(i))
         
-        ui = ipw.VBox([time_slider, tab])
+        tab_col = ipw.HBox([tab, ipw.VBox([self.colorpick, self.createLUT_button])])
+        ui = ipw.VBox([time_slider, tab_col])
 
         out = ipw.interactive_output(f, ui_widgets)
 
@@ -131,7 +139,7 @@ class Combcol:
         
         fig, axes = plt.subplots(1,2,figsize = (7,3))
         ims=[]
-        for t in range(10):#range(im_proj.shape[0]):
+        for t in range(self.image.shape[0]):
 
             #create multi-channel iamge
             newim = self.combine(self.image[t,::])
@@ -139,7 +147,8 @@ class Combcol:
             a1 = axes[0].imshow(newim)
             ims.append([a1])
             for c in range(2):
-                _,_,a2 = axes[1].hist(np.ravel(self.image[t,c,:,:]),color = self.selected_colors[c],alpha = 0.5,
+                _,_,a2 = axes[1].hist(np.ravel(self.image[t,c,:,:]),
+                                      color = self.colormaps[self.selected_colors[c]].colors[-1],alpha = 0.5,
                         bins = np.arange(0,8000,100))
                 ims[-1]+=a2
             axes[0].set_axis_off()
@@ -155,7 +164,7 @@ class Combcol:
         moviewriter = FFMpegWriter(fps=15)
         fig, axes = plt.subplots(1,2,figsize = (7,3))
         with moviewriter.saving(fig, movie_name, dpi=100):
-            for t in range(10):#range(im_proj.shape[0]):
+            for t in range(im_proj.shape[0]):
                 
                 axes[1].cla()
                 #create multi-channel iamge
@@ -163,8 +172,9 @@ class Combcol:
                 #show image and histogram
                 axes[0].imshow(newim)
                 for c in range(2):
-                    axes[1].hist(np.ravel(self.image[t,c,:,:]),color = self.selected_colors[c],alpha = 0.5,
-                            bins = np.arange(0,8000,100))
+                    axes[1].hist(np.ravel(self.image[t,c,:,:]),
+                                      color = self.colormaps[self.selected_colors[c]].colors[-1],alpha = 0.5,
+                        bins = np.arange(0,8000,100))
                 axes[0].set_axis_off()
             
                 #update_figure(i)
@@ -193,6 +203,18 @@ class Combcol:
         self.out_movie.clear_output()
         with self.out_movie:
             display(HTML(ani.to_html5_video()))
-            #display(Video('./movie.mp4'))
-            #display(HTML('<div align="middle"><video width="80%" controls><source src="./movie.mp4" type="video/mp4"></video></div>'))
             
+          
+    def createLUT(self, b):
+        '''Create a new color scale based on a picked color'''
+        
+        chosen_col = np.array(list(int(self.colorpick.value[i:i+2], 16) for i in (1, 3, 5)))/255
+        new_col_scale = np.c_[np.linspace(0,chosen_col[0],256),np.linspace(0,chosen_col[1],256),np.linspace(0,chosen_col[2],256)]
+        new_map = ListedColormap(new_col_scale)
+        new_name = 'New col'+str(len(self.possible_colors)-3)
+        self.colormaps[new_name] = new_map
+        
+        self.possible_colors.append(new_name)
+        for i in range(3):
+            self.color_select[i].options = self.possible_colors
+          
