@@ -45,7 +45,10 @@ class Combcol:
         self.selected_colors = ['Red', 'Green', 'Blue']
         
         self.possible_colors = ['Red','Green','Blue','Cyan','Magenta']
-        self.color_select = [ipw.Select(options = self.possible_colors, value = self.possible_colors[i],layout={'width': '300px'}) for i in range(3)]
+        self.color_select = [ipw.Select(options = self.possible_colors, 
+                                        value = self.possible_colors[i],
+                                        rows = 8,
+                                        layout={'width': '300px'}) for i in range(3)]
         
         self.def_colormaps()
         
@@ -53,9 +56,10 @@ class Combcol:
         self.hist_button.on_click(self.button_callback)
         self.out_movie = ipw.Output()
         
-        self.colorpick = ipw.ColorPicker()
-        self.createLUT_button = ipw.Button(description = 'Create colormap')
+        self.colorpick = ipw.ColorPicker(description='Pick a color',style = {'description_width': '150px'})
+        self.createLUT_button = ipw.Button(description = 'Create colormap',layout={'width': '300px'})
         self.createLUT_button.on_click(self.createLUT)
+        self.colorname = ipw.Text(description='Name the color', style = {'description_width': '150px'})
         
        
     def def_colormaps(self):
@@ -133,14 +137,14 @@ class Combcol:
         for i in range(len(children)):
             tab.set_title(i, 'Channel '+str(i))
         
-        tab_col = ipw.HBox([tab, ipw.VBox([self.colorpick, self.createLUT_button])])
-        ui = ipw.VBox([time_slider, tab_col])
+        ui = ipw.HBox([tab, ipw.VBox([self.colorpick, self.colorname, self.createLUT_button])])
+        #ui = ipw.VBox([time_slider, tab_col])
 
         #connecte rendering function with widets
         out = ipw.interactive_output(f, ui_widgets)
 
         #display widgets (ui) and plot (out)
-        display(ipw.HBox([out, ui]))
+        display(ipw.HBox([ipw.VBox([out,time_slider]), ui]))
     
     
     def movie_histogram(self):
@@ -160,10 +164,10 @@ class Combcol:
                                       color = self.colormaps[self.selected_colors[c]].colors[-1],alpha = 0.5,
                         bins = np.arange(0,8000,100))
                 ims[-1]+=a2
+            axes[1].set_facecolor((0, 0,0))
             axes[0].set_axis_off()
             
-        ani = animation.ArtistAnimation(fig, ims, interval=200, blit=True,
-                                repeat_delay=1000)
+        ani = animation.ArtistAnimation(fig, ims, interval=200, blit=True, repeat_delay=1000)
         return ani
     
     
@@ -206,10 +210,15 @@ class Combcol:
         chosen_col = np.array(list(int(self.colorpick.value[i:i+2], 16) for i in (1, 3, 5)))/255
         new_col_scale = np.c_[np.linspace(0,chosen_col[0],256),np.linspace(0,chosen_col[1],256),np.linspace(0,chosen_col[2],256)]
         new_map = ListedColormap(new_col_scale)
-        new_name = 'New col'+str(len(self.possible_colors)-3)
+        if len(self.colorname.value)>0:
+            new_name = self.colorname.value
+        else:
+            new_name = 'New col'+str(len(self.possible_colors)-4)
         self.colormaps[new_name] = new_map
         
         self.possible_colors.append(new_name)
+        temp_index = [x.index for x in self.color_select]
         for i in range(3):
             self.color_select[i].options = self.possible_colors
+            self.color_select[i].index = temp_index[i]
           
